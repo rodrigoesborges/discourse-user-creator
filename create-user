@@ -8,10 +8,10 @@ if [ -f "CREATE_USER_DEFAULTS.txt" ]
 then
    source "CREATE_USER_DEFAULTS.txt"
 fi
-if  [ "$#" -lt "4" ]
+if  [ "$#" -lt "5" ]
 then
     ERROR=1
-    echo "Usage: $0 'Real Name' email user_name group_id password "
+    echo "Usage: $0 'Real Name' email user_name group_id customuserfield password "
     echo
     echo "      Password can be omitted if '$DISCOURSE_PASSWORD' is set."
     echo
@@ -47,9 +47,10 @@ NAME=$1
 USERNAME=$3
 EMAIL=$2
 GROUP=$4
-if [ ! -z "$5" ]
+CUSTOM=$5
+if [ ! -z "$6" ]
 then
-    PASSWORD="$5"
+    PASSWORD="$6"
 else
   if [ ! -z "$DISCOURSE_PASSWORD" ]
   then
@@ -59,16 +60,26 @@ fi
 
 echo -n "Creating user: $USERNAME "
 
-OUTPUT=`curl -s -X POST --data "active=true&name=$NAME&username=$USERNAME&email=$EMAIL&password=$PASSWORD&api_key=$DISCOURSE_API_KEY&api_username=$DISCOURSE_API_USER" $DISCOURSE_URL/users`
+curl -k -i -sS -X POST  "$DISCOURSE_URL/users" \
+-H "Content-Type: multipart/form-data;" \
+-H "Api-Key: $DISCOURSE_API_KEY" \
+-H "Api-username: $DISCOURSE_API_USER" \
+-F "active=true" \
+-F "name=$NAME" \
+-F "username=$USERNAME" \
+-F "email=$EMAIL" \
+-F "password=$PASSWORD" \
+-F "user_fields[1]=$CUSTOM"
 USER_ID=`echo $OUTPUT |cut -d , -f 4 | cut -d : -f 2 |cut -d } -f 1`
 echo -n "user $USERNAME created."
-#echo -n "... deactivating"
+echo -n "with user id $USER_ID"
+echo -n "... deactivating"
 OUTPUT=`curl -s -X PUT "$DISCOURSE_URL/admin/users/$USER_ID/deactivate.json?api_key=$DISCOURSE_API_KEY&api_username=$DISCOURSE_API_USER"`
-#echo -n $OUTPUT
-#echo -n "... activating "
+echo -n $OUTPUT
+echo -n "... activating "
 echo -n " . "
 OUTPUT=`curl -s -X PUT "$DISCOURSE_URL/admin/users/$USER_ID/activate.json?api_key=$DISCOURSE_API_KEY&api_username=$DISCOURSE_API_USER"`
-#echo -n $OUTPUT
+echo -n $OUTPUT
 echo -n " . "
 # add to group
 if [ ! -z "$GROUP" ]
